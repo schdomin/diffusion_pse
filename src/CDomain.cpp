@@ -59,53 +59,22 @@ void CDomain::updateHeatDistributionNumerical( )
         for( unsigned int vk = 0; vk < m_uNumberOfGridPoints1D; ++vk )
         {
             //ds get 2d vector of current coordinates
-            double dXk[2] = { uk, vk };
-
-            //ds get indexes of possible interactive particles
-            unsigned int upStart = uk - 10;
-            unsigned int upEnd   = uk + 10;
-            unsigned int vpStart = vk - 10;
-            unsigned int vpEnd   = vk + 10;
-
-            //ds fix indexes for values below zero and above maximum
-            if( 10 > uk ){ upStart = 0; }
-            if( 10 > vk ){ vpStart = 0; }
-            if( m_uNumberOfGridPoints1D < upEnd ){ upEnd = m_uNumberOfGridPoints1D; }
-            if( m_uNumberOfGridPoints1D < vpEnd ){ vpEnd = m_uNumberOfGridPoints1D; }
+            const double dXk[2] = { uk*m_dGridPointSpacing, vk*m_dGridPointSpacing };
 
             //ds inner sum of formula
             double dInnerSum( 0.0 );
 
-            //ds loop over all other grid points
-            for( unsigned int up = upStart; up < upEnd; ++up )
+            //ds loop 20x20
+            for( unsigned int u = 0; u < 20; ++u )
             {
-                for( unsigned int vp = vpStart; vp < vpEnd; ++vp )
+                for( unsigned int v = 0; v < 20; ++v )
                 {
-                    //ds if we are not ourself
-                    if( uk != up && vk != vp )
-                    {
-                        //ds get 2d vector of current coordinates
-                        double dXp[2] = { up, vp };
 
-                        //ds we have to loop over the squared boundary conditions
-                        for( double dX = m_prBoundaries.first-m_dBoundarySize; dX < m_prBoundaries.second+m_dBoundarySize; ++dX )
-                        {
-                            for( double dY = m_prBoundaries.first-m_dBoundarySize; dY < m_prBoundaries.second+m_dBoundarySize; ++dY )
-                            {
-                                //ds map indexes to grid space and add them - the heat grid accesses stay the same
-                                dXp[0] += dX*m_dGridPointSpacing;
-                                dXp[1] += dY*m_dGridPointSpacing;
-
-                                //sum up
-                                dInnerSum += m_dVolP*( m_gridHeat[up][vp] - m_gridHeat[uk][vk] )*getKernel( dXp, dXk );
-                            }
-                        }
-                    }
                 }
             }
 
             //ds add final part of formula
-            m_gridHeat[uk][vk] = m_dTimeStepSize*m_dDiffusionCoefficient/( m_dEpsilon*m_dEpsilon )*dInnerSum + m_gridHeat[uk][vk];
+            m_gridHeat[uk][vk] = m_dTimeStepSize*m_dDiffusionCoefficient/( m_dEpsilon*m_dEpsilon )*m_dVolP*dInnerSum + m_gridHeat[uk][vk];
         }
     }
 }
