@@ -18,6 +18,7 @@ public:
              const std::pair< double, double >& p_prBoundaries,
              const double& p_dBoundarySize,
              const unsigned int& p_uNumberOfGridPoints1D,
+             const unsigned int& p_uNumberOfParticles,
              const double& p_dGridPointSpacing,
              const double& p_dTimeStepSize );
 
@@ -35,12 +36,13 @@ private:
     const double m_dBoundarySize;
     const double m_dGridPointSpacing;
     const unsigned int m_uNumberOfGridPoints1D;
+    const unsigned int m_uNumberOfParticles;
     const double m_dTimeStepSize;
-    const double m_dDiffusionFactor;
 
     //ds 2d-kernel
     const double m_dEpsilon;
     const double m_dVolP;
+    const double m_PSEFactor;
 
     //ds stream for offline data - needed for the movie and graphs
     std::string m_strLogHeatDistribution;

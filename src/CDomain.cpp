@@ -1,8 +1,10 @@
 #include "CDomain.h"
 #include <math.h>    //ds fabs, etc.
-#include <iostream>
 
 
+
+//ds speed
+static const double M_PI_SQUARED = M_PI*M_PI;
 
 namespace Diffusion
 {
@@ -12,16 +14,18 @@ CDomain::CDomain( const double& p_dDiffusionCoefficient,
              const std::pair< double, double >& p_prBoundaries,
              const double& p_dBoundarySize,
              const unsigned int& p_uNumberOfGridPoints1D,
+             const unsigned int& p_uNumberOfParticles,
              const double& p_dGridPointSpacing,
              const double& p_dTimeStepSize ) : m_dDiffusionCoefficient( p_dDiffusionCoefficient ),
                                                m_prBoundaries( p_prBoundaries ),
                                                m_dBoundarySize( p_dBoundarySize ),
                                                m_uNumberOfGridPoints1D( p_uNumberOfGridPoints1D ),
+                                               m_uNumberOfParticles( p_uNumberOfParticles ),
                                                m_dGridPointSpacing( p_dGridPointSpacing ),
                                                m_dTimeStepSize( p_dTimeStepSize ),
-                                               m_dDiffusionFactor( p_dTimeStepSize*p_dDiffusionCoefficient/( 2*( p_dGridPointSpacing*p_dGridPointSpacing ) ) ),
                                                m_dEpsilon( 2*p_dGridPointSpacing ),
                                                m_dVolP( p_dGridPointSpacing*p_dGridPointSpacing ),
+                                               m_PSEFactor( p_dTimeStepSize*p_dDiffusionCoefficient/( m_dEpsilon*m_dEpsilon )*m_dVolP ),
                                                m_strLogHeatDistribution( "" ),
                                                m_strLogNorms( "" )
 
@@ -53,6 +57,9 @@ CDomain::~CDomain( )
 //ds accessors
 void CDomain::updateHeatDistributionNumerical( )
 {
+    //ds heat change for current time step
+    double gridHeatChangePSE[m_uNumberOfGridPoints1D][m_uNumberOfGridPoints1D];
+
     //ds for all grid points
     for( unsigned int uk = 0; uk < m_uNumberOfGridPoints1D; ++uk )
     {
@@ -65,16 +72,47 @@ void CDomain::updateHeatDistributionNumerical( )
             double dInnerSum( 0.0 );
 
             //ds loop 20x20
-            for( unsigned int u = 0; u < 20; ++u )
+            for( int i = -10; i <= 10; ++i )
             {
-                for( unsigned int v = 0; v < 20; ++v )
+                for( int j = -10; j <= 10; ++j )
                 {
+                    //ds get current indexes up, vp
+                    int up = uk + i;
+                    int vp = vk + j;
 
+                    //ds if we are not ourself (unsigned overflow no problem here)
+                    if( uk != static_cast< unsigned int >( up ) && vk != static_cast< unsigned int >( vp ) )
+                    {
+                        //ds offset value (required for spaced positions)
+                        double dOffsetU = 0.0;
+                        double dOffsetV = 0.0;
+
+                        //ds check boundary
+                        if( 0 > up                        ){ up += m_uNumberOfGridPoints1D; dOffsetU = -m_dBoundarySize; } //ds moving to negative boundary
+                   else if( m_uNumberOfGridPoints1D <= up ){ up -= m_uNumberOfGridPoints1D; dOffsetU = m_dBoundarySize;  } //ds moving to positive boundary
+                        if( 0 > vp                        ){ vp += m_uNumberOfGridPoints1D; dOffsetV = -m_dBoundarySize; } //ds moving to negative boundary
+                   else if( m_uNumberOfGridPoints1D <= vp ){ vp -= m_uNumberOfGridPoints1D; dOffsetV = m_dBoundarySize;  } //ds moving to positive boundary
+
+                        //ds get 2d vector of current coordinates
+                        const double dXp[2] = { ( up*m_dGridPointSpacing + dOffsetU ), ( vp*m_dGridPointSpacing + dOffsetV ) };
+
+                        //ds compute inner sum
+                        dInnerSum += ( m_gridHeat[up][vp] - m_gridHeat[uk][vk] )*getKernel( dXp, dXk );
+                    }
                 }
             }
 
-            //ds add final part of formula
-            m_gridHeat[uk][vk] = m_dTimeStepSize*m_dDiffusionCoefficient/( m_dEpsilon*m_dEpsilon )*m_dVolP*dInnerSum + m_gridHeat[uk][vk];
+            //ds add final part of formula and save in temporary grid
+            gridHeatChangePSE[uk][vk] = m_PSEFactor*dInnerSum;
+        }
+    }
+
+    //ds copy all computed values to original grid
+    for( unsigned int u = 0; u < m_uNumberOfGridPoints1D; ++u )
+    {
+        for( unsigned int v = 0; v < m_uNumberOfGridPoints1D; ++v )
+        {
+            m_gridHeat[u][v] += gridHeatChangePSE[u][v];
         }
     }
 }
@@ -149,8 +187,8 @@ void CDomain::saveNormsToStream( const double& p_dCurrentTime )
     }
 
     //ds scale L1, L2
-    dL1 /= m_uNumberOfGridPoints1D;
-    dL2 /= m_uNumberOfGridPoints1D;
+    dL1 /= m_uNumberOfParticles;
+    dL2 /= m_uNumberOfParticles;
     dL2 = sqrt( dL2 );
 
     //ds buffer for snprintf
@@ -214,27 +252,18 @@ void CDomain::setInitialHeatDistribution( )
             m_gridHeat[u][v] = sin( u*m_dGridPointSpacing*2*M_PI )*sin( v*m_dGridPointSpacing*2*M_PI );
         }
     }
-
-    //ds set boundary values
-    for( unsigned int u = 0; u < m_uNumberOfGridPoints1D; ++u )
-    {
-        m_gridHeat[u][0]                         = 0.0;
-        m_gridHeat[u][m_uNumberOfGridPoints1D-1] = 0.0;
-        m_gridHeat[0][u]                         = 0.0;
-        m_gridHeat[m_uNumberOfGridPoints1D-1][u] = 0.0;
-    }
 }
 
 double CDomain::getHeatAnalytical( const double& p_dX, const double& p_dY, const double& p_dT ) const
 {
     //ds formula
-    return sin( p_dX*2*M_PI )*sin( p_dY*2*M_PI )*exp( -8*m_dDiffusionCoefficient*M_PI*M_PI*p_dT );
+    return sin( p_dX*2*M_PI )*sin( p_dY*2*M_PI )*exp( -8*m_dDiffusionCoefficient*M_PI_SQUARED*p_dT );
 }
 
 double CDomain::getKernel( const double p_dXp[2], const double p_dXk[2] ) const
 {
     //ds compute distance (using pow for readability)
-    const double dDistance = sqrt( ( p_dXp[1] - p_dXk[1] )*( p_dXp[1] - p_dXk[1] ) + ( p_dXp[2] - p_dXk[2] )*( p_dXp[2] - p_dXk[2] ) );
+    const double dDistance = sqrt( ( p_dXp[0] - p_dXk[0] )*( p_dXp[0] - p_dXk[0] ) + ( p_dXp[1] - p_dXk[1] )*( p_dXp[1] - p_dXk[1] ) );
 
     //ds if we are out of the cutoff
     if( 5*m_dEpsilon < dDistance )
@@ -244,7 +273,7 @@ double CDomain::getKernel( const double p_dXp[2], const double p_dXk[2] ) const
     else
     {
         //return kernel function
-        return 16.0/( M_PI*M_PI*( pow( dDistance, 8 ) + 1.0 ) );
+        return 16.0/( M_PI_SQUARED*( pow( dDistance, 8 ) + 1.0 ) );
     }
 }
 

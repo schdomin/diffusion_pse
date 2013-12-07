@@ -22,7 +22,8 @@ int main( int argc, char** argv )
     const std::pair< double, double > prBoundaries( 0.0, 1.0 );
     const double dBoundarySize = fabs( prBoundaries.second - prBoundaries.first );
     const unsigned int uNumberOfGridPoints1D( atoi( argv[1] ) );
-    const double dGridPointSpacing( dBoundarySize/uNumberOfGridPoints1D );
+    const unsigned int uNumberOfParticles( uNumberOfGridPoints1D*uNumberOfGridPoints1D );
+    const double dGridPointSpacing( dBoundarySize/( uNumberOfGridPoints1D - 1 ) );
     const unsigned int uNumberOfTimeSteps( atoi( argv[2] ) );
     const double dTimeStepSize( 0.5*dGridPointSpacing*dGridPointSpacing/dDiffusionCoefficient );
 
@@ -31,13 +32,14 @@ int main( int argc, char** argv )
     std::cout << "   Diffusion Coefficient: "  << dDiffusionCoefficient << std::endl;
     std::cout << "           Boundary (2D): [" << prBoundaries.first << ", " << prBoundaries.second << "]" << std::endl;
     std::cout << "Number of Grid Points 1D: "  << uNumberOfGridPoints1D << std::endl;
+    std::cout << "     Number of Particles: "  << uNumberOfParticles << std::endl;
     std::cout << "      Grid Point Spacing: "  << dGridPointSpacing << std::endl;
     std::cout << "    Number of Time Steps: "  << uNumberOfTimeSteps << std::endl;
     std::cout << "          Time Step Size: "  << dTimeStepSize << std::endl;
     std::cout << "------------------------------------------------------------------------------" << std::endl;
 
     //ds allocate domain (automatically creates initial density distribution)
-    Diffusion::CDomain cDomain( dDiffusionCoefficient, prBoundaries, dBoundarySize, uNumberOfGridPoints1D, dGridPointSpacing, dTimeStepSize );
+    Diffusion::CDomain cDomain( dDiffusionCoefficient, prBoundaries, dBoundarySize, uNumberOfGridPoints1D, uNumberOfParticles, dGridPointSpacing, dTimeStepSize );
 
     //ds information
     std::cout << "               Status:  0% done - current time: 0";
@@ -96,12 +98,12 @@ int main( int argc, char** argv )
             cDomain.updateHeatDistributionNumerical( );
 
             //ds streaming
-            //cDomain.saveHeatGridToStream( );
+            cDomain.saveHeatGridToStream( );
             cDomain.saveNormsToStream( dCurrentTime );
         }
 
         //ds save the streams to a file
-        //cDomain.writeHeatGridToFile( "bin/simulation.txt", uNumberOfTimeSteps );
+        cDomain.writeHeatGridToFile( "bin/simulation.txt", uNumberOfTimeSteps );
         cDomain.writeNormsToFile( "bin/norms.txt", uNumberOfTimeSteps, dTimeStepSize );
     }
 
