@@ -48,6 +48,9 @@ private:
     std::string m_strLogHeatDistribution;
     std::string m_strLogNorms;
 
+    //ds PNG
+    unsigned int m_uNumberOfImagesSaved;
+
 //ds accessors
 public:
 
@@ -55,6 +58,7 @@ public:
     void updateHeatDistributionAnalytical( const double& p_dCurrentTime );
     void saveHeatGridToStream( );
     void saveNormsToStream( const double& p_dCurrentTime );
+    void saveMeshToPNG( const unsigned int& p_uCurrentTimeStep, const unsigned int& p_uRate );
     void writeHeatGridToFile( const std::string& p_strFilename, const unsigned int& p_uNumberOfTimeSteps ) const;
     void writeNormsToFile( const std::string& p_strFilename, const unsigned int& p_uNumberOfTimeSteps, const double& p_dTimeStepSize ) const;
 
@@ -64,8 +68,11 @@ private:
     void setInitialHeatDistribution( );
     double getHeatAnalytical( const double& p_dX, const double& p_dY, const double& p_dT ) const;
 
-    //kernel
-    double getKernel( const double p_dXp[2], const double p_dXk[2] ) const;
+    //kernels
+    double getKernelEta( const double p_dXp[2], const double p_dXk[2] ) const;
+    double getKernelW( const double& p_dLambda ) const;
+    double clamp(const double &x, const double &a, const double &b) const;
+    unsigned char* getP2M( const unsigned int& p_uMeshSize ) const;
 
 }; //class CDomain
 

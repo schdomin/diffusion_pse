@@ -98,12 +98,13 @@ int main( int argc, char** argv )
             cDomain.updateHeatDistributionNumerical( );
 
             //ds streaming
-            cDomain.saveHeatGridToStream( );
+            //cDomain.saveHeatGridToStream( );
             cDomain.saveNormsToStream( dCurrentTime );
+            //cDomain.saveMeshToPNG( uCurrentTimeStep, 10 );
         }
 
         //ds save the streams to a file
-        cDomain.writeHeatGridToFile( "bin/simulation.txt", uNumberOfTimeSteps );
+        //cDomain.writeHeatGridToFile( "bin/simulation.txt", uNumberOfTimeSteps );
         cDomain.writeNormsToFile( "bin/norms.txt", uNumberOfTimeSteps, dTimeStepSize );
     }
 

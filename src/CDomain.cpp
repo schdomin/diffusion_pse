@@ -1,5 +1,7 @@
 #include "CDomain.h"
 #include <math.h>    //ds fabs, etc.
+#include "writepng.h"
+#include <iostream>
 
 
 
@@ -27,7 +29,8 @@ CDomain::CDomain( const double& p_dDiffusionCoefficient,
                                                m_dVolP( p_dGridPointSpacing*p_dGridPointSpacing ),
                                                m_PSEFactor( p_dTimeStepSize*p_dDiffusionCoefficient/( m_dEpsilon*m_dEpsilon )*m_dVolP ),
                                                m_strLogHeatDistribution( "" ),
-                                               m_strLogNorms( "" )
+                                               m_strLogNorms( "" ),
+                                               m_uNumberOfImagesSaved( 1 )
 
 {
     //ds allocate memory for the data structure
@@ -97,7 +100,7 @@ void CDomain::updateHeatDistributionNumerical( )
                         const double dXp[2] = { ( up*m_dGridPointSpacing + dOffsetU ), ( vp*m_dGridPointSpacing + dOffsetV ) };
 
                         //ds compute inner sum
-                        dInnerSum += ( m_gridHeat[up][vp] - m_gridHeat[uk][vk] )*getKernel( dXp, dXk );
+                        dInnerSum += ( m_gridHeat[up][vp] - m_gridHeat[uk][vk] )*getKernelEta( dXp, dXk );
                     }
                 }
             }
@@ -202,6 +205,34 @@ void CDomain::saveNormsToStream( const double& p_dCurrentTime )
     m_strLogNorms += "\n";
 }
 
+void CDomain::saveMeshToPNG( const unsigned int& p_dCurrentTimeStep, const unsigned int& p_uRate )
+{
+    //ds if the current step matches the rate
+    if( 0 == p_dCurrentTimeStep%p_uRate )
+    {
+        //ds get mesh size
+        const unsigned int uMeshSize( 2*m_uNumberOfGridPoints1D );
+
+        //ds get the data
+        unsigned char* chMesh( getP2M( uMeshSize ) );
+
+        //ds construct picture name - buffer for snprintf
+        char chBuffer[64];
+
+        //ds format: image_number.png
+        std::snprintf( chBuffer, 64, "bin/image_%.4u.png", m_uNumberOfImagesSaved );
+
+        //ds create png
+        writePNG( chBuffer, uMeshSize, uMeshSize, chMesh );
+
+        //ds free data
+        delete chMesh;
+
+        //ds increase counter
+        ++m_uNumberOfImagesSaved;
+    }
+}
+
 void CDomain::writeHeatGridToFile( const std::string& p_strFilename, const unsigned int& p_uNumberOfTimeSteps ) const
 {
     //ds ofstream object
@@ -260,7 +291,7 @@ double CDomain::getHeatAnalytical( const double& p_dX, const double& p_dY, const
     return sin( p_dX*2*M_PI )*sin( p_dY*2*M_PI )*exp( -8*m_dDiffusionCoefficient*M_PI_SQUARED*p_dT );
 }
 
-double CDomain::getKernel( const double p_dXp[2], const double p_dXk[2] ) const
+double CDomain::getKernelEta( const double p_dXp[2], const double p_dXk[2] ) const
 {
     //ds compute distance (using pow for readability)
     const double dDistance = sqrt( ( p_dXp[0] - p_dXk[0] )*( p_dXp[0] - p_dXk[0] ) + ( p_dXp[1] - p_dXk[1] )*( p_dXp[1] - p_dXk[1] ) );
@@ -275,6 +306,75 @@ double CDomain::getKernel( const double p_dXp[2], const double p_dXk[2] ) const
         //return kernel function
         return 16.0/( M_PI_SQUARED*( pow( dDistance, 8 ) + 1.0 ) );
     }
+}
+
+double CDomain::getKernelW( const double& p_dLambda ) const
+{
+    //ds get absolute lambda
+    const double dLambdaAbs = fabs( p_dLambda );
+
+    //ds cases
+    if( 0 <= dLambdaAbs && dLambdaAbs < 1 )
+    {
+        return ( 1.0 - 5.0/2.0*dLambdaAbs*dLambdaAbs + 3.0/2.0*dLambdaAbs*dLambdaAbs*dLambdaAbs );
+    }
+    else if( 1 <= dLambdaAbs && dLambdaAbs < 2 )
+    {
+        return ( 1.0/2.0*( 2.0 - dLambdaAbs )*( 2.0 - dLambdaAbs )*( 1.0 - dLambdaAbs ) );
+    }
+    else
+    {
+        return 0.0;
+    }
+}
+
+double CDomain::clamp(const double &x, const double &a, const double &b) const
+{
+    return x < a ? a : x > b ? b : x;
+}
+
+unsigned char* CDomain::getP2M( const unsigned int& p_uMeshSize ) const
+{
+    //ds h value
+    const double dH( 1.0/p_uMeshSize );
+
+    //ds allocate data array
+    unsigned char* chMesh = new unsigned char[p_uMeshSize*p_uMeshSize*4];
+
+    //ds set data - for each data element
+    for( unsigned int i = 0; i < p_uMeshSize; ++i )
+    {
+        for( unsigned int j = 0; j < p_uMeshSize; ++j )
+        {
+            //ds index in mesh
+            unsigned int uIndexMesh = 4.0*( i*p_uMeshSize + j );
+
+            //ds concentration on mesh
+            double dConcentration( 0.0 );
+
+            //ds for all particles
+            for( unsigned int u = 0; u < m_uNumberOfGridPoints1D; ++u )
+            {
+                for( unsigned int v = 0; v < m_uNumberOfGridPoints1D; ++v )
+                {
+                    //ds get lambdas
+                    const double dLambdai = u*m_dGridPointSpacing/dH - i;
+                    const double dLambdaj = v*m_dGridPointSpacing/dH - j;
+
+                    //ds compute concentration
+                    dConcentration += m_gridHeat[u][v]*getKernelW( dLambdai )*getKernelW( dLambdaj );
+                }
+            }
+
+            //ds set the mesh values - SNIPPET
+            chMesh[uIndexMesh+0] = clamp( gamma( dConcentration ), 0.0, 0.1 )*0xFFu;  // red
+            chMesh[uIndexMesh+1] = clamp( 1.0, 0.0, 1.0 )*0xFFu;                      // green
+            chMesh[uIndexMesh+2] = clamp( gamma( -dConcentration ), 0.0, 0.1 )*0xFFu; // blue
+            chMesh[uIndexMesh+3] = 0xFFu;                                             // alpha (opacity, 0xFFu = 255)
+        }
+    }
+
+    return chMesh;
 }
 
 } //namespace Diffusion

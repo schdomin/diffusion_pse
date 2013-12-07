@@ -4,16 +4,20 @@ CC = g++
 #ds compiler flags
 CFLAGS = -c -o -03
 
+#ds libraries
+LIBS = -lpng
+
 #ds default field
 all: main
 
-	$(CC) bin/CDomain.o bin/main.o -o bin/diffusion_pse
+	$(CC) bin/writepng.o bin/CDomain.o bin/main.o -o bin/diffusion_pse $(LIBS)
 
 #ds object files
 main:
 
 	rm -rf bin
 	mkdir bin
+	$(CC) $(CFLAGS) src/writepng.cpp -o bin/writepng.o
 	$(CC) $(CFLAGS) src/CDomain.cpp -o bin/CDomain.o
 	$(CC) $(CFLAGS) src/main.cpp -o bin/main.o
 
