@@ -36,7 +36,7 @@ int main( int argc, char** argv )
     std::cout << "      Grid Point Spacing: "  << dGridPointSpacing << std::endl;
     std::cout << "    Number of Time Steps: "  << uNumberOfTimeSteps << std::endl;
     std::cout << "          Time Step Size: "  << dTimeStepSize << std::endl;
-    std::cout << "------------------------------------------------------------------------------" << std::endl;
+    std::cout << "-----------------------------------------------------------------------------" << std::endl;
 
     //ds allocate domain (automatically creates initial density distribution)
     Diffusion::CDomain cDomain( dDiffusionCoefficient, prBoundaries, dBoundarySize, uNumberOfGridPoints1D, uNumberOfParticles, dGridPointSpacing, dTimeStepSize );
@@ -114,7 +114,7 @@ int main( int argc, char** argv )
     //ds cause an output ostream
     std::cout << std::endl;
     std::cout << "     Computation time: " << dDurationSeconds << std::endl;
-    std::cout << "------------------------------------------------------------------------------\n" << std::endl;
+    std::cout << "-----------------------------------------------------------------------------\n" << std::endl;
 
     return 0;
 }
